@@ -1,44 +1,125 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="p-6">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Eventos</h1>
-        <a href="{{ route('events.create') }}" 
-        class="inline-flex items-center gap-2 bg-blue-600 text-back px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition">
-            <span class="text-lg">➕</span>
-            <span>Crear Evento</span>
+@php
+    use Carbon\Carbon;
+    $today = Carbon::today();
+
+    // Clasificamos eventos según fecha
+    $upcomingEvents = $events->filter(fn($event) => Carbon::parse($event->event_date)->isAfter($today));
+    $pastEvents = $events->filter(fn($event) => Carbon::parse($event->event_date)->isBefore($today->addDay()));
+@endphp
+
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="fw-bold text-dark mb-0">📅 Eventos</h2>
+        <a href="{{ route('events.create') }}" class="btn btn-primary shadow-sm">
+            <i class="bi bi-plus-circle me-1"></i> Crear Evento
         </a>
     </div>
 
-    <div class="grid md:grid-cols-3 gap-6">
-        @foreach($events as $event)
-            <div class="bg-white shadow rounded-xl p-5 border border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-700">{{ $event->title }}</h2>
-                <p class="text-sm text-gray-500 mb-2">{{ $event->description }}</p>
+    {{-- Tabs tipo carpeta --}}
+    <ul class="nav nav-tabs mb-4" id="eventTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="upcoming-tab" data-bs-toggle="tab" data-bs-target="#upcoming" 
+                    type="button" role="tab" aria-controls="upcoming" aria-selected="true">
+                Próximos Eventos
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="past-tab" data-bs-toggle="tab" data-bs-target="#past" 
+                    type="button" role="tab" aria-controls="past" aria-selected="false">
+                Eventos Pasados
+            </button>
+        </li>
+    </ul>
 
-                <div class="text-sm text-gray-600">
-                    📅 <strong>{{ \Carbon\Carbon::parse($event->event_date)->format('d/m/Y H:i') }}</strong><br>
-                    📍 {{ $event->location }}
+    <div class="tab-content" id="eventTabsContent">
+        {{-- Próximos eventos --}}
+        <div class="tab-pane fade show active" id="upcoming" role="tabpanel" aria-labelledby="upcoming-tab">
+            @if($upcomingEvents->isEmpty())
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
+                    <p class="fs-5">No hay próximos eventos programados.</p>
                 </div>
+            @else
+                <div class="row row-cols-1 row-cols-md-3 g-4">
+                    @foreach($upcomingEvents as $event)
+                        <div class="col">
+                            <div class="card h-100 shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary fw-bold">{{ $event->title }}</h5>
+                                    <p class="card-text text-muted">{{ $event->description }}</p>
+                                    <p class="mb-1">
+                                        <i class="bi bi-calendar-event"></i>
+                                        <strong>{{ Carbon::parse($event->event_date)->format('d/m/Y h:i A') }}</strong>
+                                    </p>
+                                    <p class="mb-2">
+                                        <i class="bi bi-geo-alt"></i> {{ $event->location }}
+                                    </p>
+                                    <div class="d-flex justify-content-between">
+                                        <a href="{{ route('events.edit', $event->id) }}" class="btn btn-warning btn-sm text-white">
+                                            <i class="bi bi-pencil-square"></i> Editar
+                                        </a>
+                                        <form action="{{ route('events.destroy', $event->id) }}" method="POST" 
+                                              onsubmit="return confirm('¿Seguro que deseas eliminar este evento?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="bi bi-trash3"></i> Eliminar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
 
-                <div class="flex justify-between items-center mt-4">
-                    <a href="{{ route('events.edit', $event->id) }}" 
-                       class="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-sm">
-                       ✏️ Editar
-                    </a>
-                    
-                    <form action="{{ route('events.destroy', $event->id) }}" method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar este evento?');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" 
-                                class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm">
-                            ❌ Eliminar
-                        </button>
-                    </form>
+        {{-- Eventos pasados --}}
+        <div class="tab-pane fade" id="past" role="tabpanel" aria-labelledby="past-tab">
+            @if($pastEvents->isEmpty())
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-hourglass-split fs-1 d-block mb-2"></i>
+                    <p class="fs-5">Aún no hay eventos pasados registrados.</p>
                 </div>
-            </div>
-        @endforeach
+            @else
+                <div class="row row-cols-1 row-cols-md-3 g-4">
+                    @foreach($pastEvents as $event)
+                        <div class="col">
+                            <div class="card h-100 shadow-sm border-0 bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title text-secondary fw-bold">{{ $event->title }}</h5>
+                                    <p class="card-text text-muted">{{ $event->description }}</p>
+                                    <p class="mb-1">
+                                        <i class="bi bi-calendar-event"></i>
+                                        <strong>{{ Carbon::parse($event->event_date)->format('d/m/Y h:i A') }}</strong>
+                                    </p>
+                                    <p class="mb-2">
+                                        <i class="bi bi-geo-alt"></i> {{ $event->location }}
+                                    </p>
+                                    <div class="d-flex justify-content-between">
+                                        <a href="{{ route('events.edit', $event->id) }}" class="btn btn-outline-warning btn-sm">
+                                            <i class="bi bi-pencil-square"></i> Editar
+                                        </a>
+                                        <form action="{{ route('events.destroy', $event->id) }}" method="POST" 
+                                              onsubmit="return confirm('¿Seguro que deseas eliminar este evento?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                <i class="bi bi-trash3"></i> Eliminar
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
     </div>
 </div>
 @endsection

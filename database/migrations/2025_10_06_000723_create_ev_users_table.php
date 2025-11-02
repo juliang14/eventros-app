@@ -15,10 +15,10 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
-            $table->unsignedBigInteger('role_id')->default(2); // relación a roles
+            $table->unsignedBigInteger('role_id')->default(2); // relación con roles
             $table->timestamps();
 
-            $table->foreign('role_id')->references('id')->on('ev_roles');
+            $table->foreign('role_id')->references('id')->on('ev_roles')->onDelete('cascade');
         });
     }
 

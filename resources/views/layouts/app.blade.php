@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'Eventos App') }}</title>
 
@@ -10,6 +11,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     {{-- Bootstrap Icons --}}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet" >
+    <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet" >
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -63,7 +66,7 @@
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userMenu" 
                            role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name) }}&background=f48fb1&color=fff"
+                            <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name) }}&background=4F56A5&color=fff"
                                  alt="avatar" class="rounded-circle me-2" width="35" height="35">
                             <span>{{ Auth::user()->name }}</span>
                         </a>
@@ -89,18 +92,32 @@
         @yield('content')
     </main>
 
+    {{-- jQuery (necesario para DataTables) --}}
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+
     {{-- Bootstrap JS --}}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    {{-- DataTables --}}
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+    {{-- Responsive --}}
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
+    {{-- 🔹 Scripts específicos de cada vista --}}
+    @stack('scripts')
 </body>
 
 {{-- Estilos custom --}}
 <style>
     .text-pink {
-        color: #ec407a !important;
+        color: #05053B !important;
     }
     .nav-link.active {
         font-weight: bold;
-        color: #ec407a !important;
+        color: #05053B !important;
     }
     .nav-link i {
         margin-right: 6px;

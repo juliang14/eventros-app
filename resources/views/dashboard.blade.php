@@ -54,7 +54,7 @@
                         <div class="row g-0">
                             <div class="col-md-4">
                                 {{-- Imagen temporal (puedes guardar un campo en la BD si quieres) --}}
-                                <img src="https://via.placeholder.com/300x200.png?text=Evento"
+                                <img src="{{ asset('images/event.png') }}"
                                      class="img-fluid h-100 rounded-start-4" alt="Evento">
                             </div>
                             <div class="col-md-8">
@@ -87,33 +87,58 @@
 
 {{-- Estilos custom --}}
 <style>
+    /* 🎨 Paleta basada en azul oscuro */
+    :root {
+        --blue-dark: #05053B;   /* principal */
+        --blue-mid: #2C2C7A;    /* hover o énfasis */
+        --blue-light: #E6E8FA;  /* fondos claros */
+        --blue-soft: #B3B6E0;   /* detalles secundarios */
+    }
+
     .quick-action {
         display: block;
-        background: #fce4ec;
+        background: var(--blue-light);
         padding: 20px;
         border-radius: 15px;
         text-decoration: none;
-        color: #333;
-        transition: all 0.3s;
+        color: var(--blue-dark);
+        transition: all 0.3s ease;
     }
+
     .quick-action:hover {
-        background: #f8bbd0;
-        color: #000;
+        background: var(--blue-soft);
+        color: var(--blue-dark);
+        box-shadow: 0 2px 8px rgba(5, 5, 59, 0.2);
     }
+
     .event-card {
         background: #fff;
+        border: 1px solid var(--blue-soft);
+        border-radius: 10px;
     }
+
     .bg-pink {
-        background-color: #f48fb1 !important;
+        background-color: var(--blue-mid) !important;
+        color: #fff !important;
     }
+
     .btn-pink {
-        background-color: #ec407a;
+        background-color: var(--blue-dark);
         color: #fff;
         border-radius: 25px;
+        transition: all 0.3s ease;
     }
+
     .btn-pink:hover {
-        background-color: #d81b60;
+        background-color: var(--blue-mid);
         color: #fff;
+        box-shadow: 0 0 10px rgba(5, 5, 59, 0.3);
+    }
+
+    /* Títulos o acentos */
+    .text-pink {
+        color: var(--blue-dark) !important;
     }
 </style>
+
 @endsection

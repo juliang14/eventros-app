@@ -11,13 +11,18 @@ return new class extends Migration
         Schema::create('ev_gifts', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('event_id');
-            $table->string('name');
-            $table->boolean('is_reserved')->default(false);
-            $table->unsignedBigInteger('reserved_by')->nullable(); // guest_id si alguien lo separa
+            $table->string('name'); // Nombre del regalo
+            $table->integer('quantity')->default(1); // Cantidad disponible
+            $table->integer('reserved_count')->default(0); // Cuántos ya fueron reservados
+            $table->boolean('is_required')->default(false); // Si es obligatorio
+            $table->boolean('hide_when_reserved')->default(false); // Si debe ocultarse al reservarse todo
+            $table->boolean('is_reserved')->default(false); // Si está completamente reservado
+            $table->string('reserved_by')->nullable(); // IDs de invitados separados por "|"
+            $table->string('image_path')->nullable(); // Imagen del regalo
             $table->timestamps();
 
+            // Relaciones
             $table->foreign('event_id')->references('id')->on('ev_events')->onDelete('cascade');
-            $table->foreign('reserved_by')->references('id')->on('ev_guests')->onDelete('set null');
         });
     }
 

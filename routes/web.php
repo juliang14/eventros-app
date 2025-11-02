@@ -19,8 +19,9 @@ Route::get('/', function () {
 });
 
 // Invitaciones (acceso sin login)
-Route::get('/invitacion/{code}', [RsvpController::class, 'show'])->name('invitacion.show');
-Route::post('/invitacion/{code}/rsvp', [RsvpController::class, 'rsvp'])->name('invitacion.rsvp');
+Route::get('/invitations/{code}', [RsvpController::class, 'show'])->name('invitations.show');
+Route::post('/invitations/{code}/rsvp', [RsvpController::class, 'store'])->name('invitations.rsvp');
+
 
 
 /*
@@ -48,7 +49,7 @@ Route::middleware(['auth', AdminMiddleware::class])->group(function () {
     Route::resource('guests', GuestController::class);
 
     // 📂 Importar invitados desde archivo Excel
-    Route::post('/guests/import', [GuestController::class, 'import'])->name('guests.import');
+    Route::post('/importar-excel', [GuestController::class, 'importarExcel'])->name('importarExcel');
 
     /*
     |--------------------------------------------------------------------------

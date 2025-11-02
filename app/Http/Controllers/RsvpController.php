@@ -3,71 +3,72 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Guest;
+use App\Models\Gift;
+use App\Models\Rsvp;
+use Illuminate\Support\Facades\DB;
 
 class RsvpController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function show($invite_code, Request $request)
     {
-        //
+        $guest = Guest::where('invite_code', $invite_code)->firstOrFail();
+        $event = $guest->event;
+        $gifts = Gift::where('event_id', $event->id)->get();
+
+        if ($request->has('change')) {
+            session(['allow_change' => true]);
+        } else {
+            session()->forget('allow_change');
+        }
+
+        return view('invitations.show', compact('guest', 'event', 'gifts'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function store(Request $request, $invite_code)
     {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
-    }
-
-    public function store(Request $request, $invite_code){
-        $guest = \App\Models\Guest::where('invite_code', $invite_code)->firstOrFail();
+        $guest = Guest::where('invite_code', $invite_code)->firstOrFail();
 
         $data = $request->validate([
-            'status' => 'required|in:yes,no,maybe',
-            'companions' => 'nullable|integer|min:0',
+            'status' => 'required|in:confirmed,declined',
+            'gifts' => 'array',
+            'gifts.*' => 'integer|exists:ev_gift,id'
         ]);
 
-        $rsvp = \App\Models\Rsvp::updateOrCreate(
-            ['guest_id' => $guest->id],
-            ['status' => $data['status'], 'companions' => $data['companions'] ?? 0]
-        );
+        DB::transaction(function() use ($guest, $data) {
 
-        return redirect()->back()->with('success', 'Respuesta registrada. ¡Gracias!');
+            // 1️⃣ Crear o actualizar RSVP
+            Rsvp::updateOrCreate(
+                ['guest_id' => $guest->id],
+                ['status' => $data['status']]
+            );
+
+            // 2️⃣ Si confirma asistencia, actualizar regalos seleccionados
+            if ($data['status'] === 'confirmed' && !empty($data['gifts'])) {
+                foreach ($data['gifts'] as $giftId) {
+                    $gift = Gift::lockForUpdate()->find($giftId); // Evita conflictos concurrentes
+
+                    if ($gift && $gift->reserved_count < $gift->quantity) {
+                        // Revisar si el invitado ya está registrado en reserved_by
+                        $reservedBy = $gift->reserved_by ? explode('|', $gift->reserved_by) : [];
+
+                        if (!in_array($guest->id, $reservedBy)) {
+                            $reservedBy[] = $guest->id;
+
+                            // Incrementar contador y actualizar reserved_by
+                            $gift->update([
+                                'reserved_count' => $gift->reserved_count + 1,
+                                'reserved_by' => implode('|', $reservedBy)
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // 3️⃣ Actualizar campo confirmed del invitado
+            $guest->update(['confirmed' => $data['status'] === 'confirmed']);
+        });
+
+        return redirect()->back()->with('success', 'Respuesta registrada. ¡Gracias por confirmar tu asistencia!');
     }
-
 }

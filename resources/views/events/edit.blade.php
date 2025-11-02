@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="container">
-    <h1>Editar Evento</h1>
+    <h1 class="text-center" >Editar Evento</h1>
 
     @if ($errors->any())
         <div class="alert alert-danger">
@@ -25,7 +25,7 @@
 
         <div class="mb-3">
             <label for="event_date" class="form-label">Fecha del Evento</label>
-            <input type="date" name="event_date" class="form-control" value="{{ old('event_date', $event->event_date) }}" required>
+            <input type="datetime-local" name="event_date" class="form-control" value="{{ old('event_date', \Carbon\Carbon::parse($event->event_date)->format('Y-m-d\TH:i')) }}" required>
         </div>
 
         <div class="mb-3">

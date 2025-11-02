@@ -15,9 +15,10 @@ class GuestController extends Controller
      */
     public function index()
     {
-        $guests = Guest::with('event')->latest()->get();
+        $events = Event::all(['id', 'title']); // solo lo necesario
+        $guests = Guest::all();
 
-        return view('guests.index', compact('guests'));
+        return view('guests.index', compact('events', 'guests'));
     }
 
     /**
@@ -25,7 +26,7 @@ class GuestController extends Controller
      */
     public function create()
     {
-        $events = Event::orderBy('name')->get();
+        $events = Event::orderBy('title')->get();
         return view('guests.create', compact('events'));
     }
 
@@ -42,15 +43,13 @@ class GuestController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return redirect()->back()
-                             ->withErrors($validator)
-                             ->withInput();
+            return redirect()->back()->withErrors($validator)->withInput();
         }
 
         Guest::create($request->all());
 
         return redirect()->route('guests.index')
-                         ->with('success', '🎉 Invitado registrado correctamente.');
+            ->with('success', '🎉 Invitado registrado correctamente.');
     }
 
     /**
@@ -58,7 +57,7 @@ class GuestController extends Controller
      */
     public function edit(Guest $guest)
     {
-        $events = Event::orderBy('name')->get();
+        $events = Event::orderBy('title')->get();
         return view('guests.edit', compact('guest', 'events'));
     }
 
@@ -75,15 +74,13 @@ class GuestController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return redirect()->back()
-                             ->withErrors($validator)
-                             ->withInput();
+            return redirect()->back()->withErrors($validator)->withInput();
         }
 
         $guest->update($request->all());
 
         return redirect()->route('guests.index')
-                         ->with('success', '✅ Invitado actualizado correctamente.');
+            ->with('success', '✅ Invitado actualizado correctamente.');
     }
 
     /**
@@ -94,40 +91,86 @@ class GuestController extends Controller
         $guest->delete();
 
         return redirect()->route('guests.index')
-                         ->with('success', '🗑️ Invitado eliminado correctamente.');
+            ->with('success', '🗑️ Invitado eliminado correctamente.');
     }
 
     /**
-     * Importar invitados desde Excel.
+     * Importar invitados desde archivo Excel (con respuesta JSON).
      */
-    public function import(Request $request)
+    public function importarExcel(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:xlsx,csv,xls',
-        ]);
+        try {
+            // ✅ Validación del formulario
+            $request->validate([
+                'event_id' => 'required|exists:ev_events,id',
+                'excelFile' => 'required|file|mimes:xlsx,xls,csv'
+            ]);
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator);
-        }
+            $eventId = $request->event_id;
+            $file = $request->file('excelFile');
 
-        $file = $request->file('file');
-        $data = Excel::toArray([], $file);
+            // ✅ Leemos el archivo completo
+            $rows = Excel::toCollection(null, $file)[0];
 
-        $count = 0;
+            // Extraemos encabezados (primera fila) y limpiamos nombres
+            $headers = $rows->shift()->map(fn($h) => strtolower(trim($h)));
 
-        foreach ($data[0] as $row) {
-            if (!empty($row[0])) {
-                Guest::create([
-                    'event_id' => $row[0], // ID del evento
-                    'name'     => $row[1] ?? 'Invitado sin nombre',
-                    'email'    => $row[2] ?? null,
-                    'phone'    => $row[3] ?? null,
-                ]);
-                $count++;
+            $insertados = 0;
+            $duplicados = 0;
+            $errores = 0;
+
+            // ✅ Recorremos las filas restantes
+            foreach ($rows as $row) {
+                $data = $headers->combine($row); // Asocia encabezado → valor
+
+                // Si no hay nombre, se omite la fila
+                if (empty($data['name'])) continue;
+
+                try {
+                    // Evitar duplicados por correo + evento
+                    $exists = Guest::where('email', $data['email'] ?? '')
+                        ->where('event_id', $eventId)
+                        ->exists();
+
+                    if ($exists) {
+                        $duplicados++;
+                        continue;
+                    }
+
+                    // Crear invitado
+                    Guest::create([
+                        'name' => $data['name'],
+                        'email' => $data['email'] ?? null,
+                        'phone' => $data['phone'] ?? null,
+                        'companions_names' => $data['companions_names'] ?? null,
+                        'companions_count' => !empty($data['companions_names'])
+                            ? count(explode('|', $data['companions_names']))
+                            : 0,
+                        'event_id' => $eventId,
+                    ]);
+
+                    $insertados++;
+                } catch (\Exception $e) {
+                    $errores++;
+                }
             }
-        }
 
-        return redirect()->route('guests.index')
-                         ->with('success', "📥 Se importaron {$count} invitados correctamente.");
+            // ✅ Respuesta exitosa
+            return response()->json([
+                'success' => true,
+                'message' => 'Importación completada correctamente',
+                'total' => $rows->count(),
+                'insertados' => $insertados,
+                'duplicados' => $duplicados,
+                'errores' => $errores,
+            ]);
+        } catch (\Exception $e) {
+            // ⚠️ Manejo de errores
+            return response()->json([
+                'success' => false,
+                'message' => 'Error durante la importación: ' . $e->getMessage(),
+            ]);
+        }
     }
+
 }

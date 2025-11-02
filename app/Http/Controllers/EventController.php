@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class EventController extends Controller
 {
@@ -31,12 +32,18 @@ class EventController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'title' => 'required',
+            'title' => 'required|string|max:255',
             'event_date' => 'required|date',
-            'location' => 'required',
+            'location' => 'required|string|max:255',
         ]);
 
-        Event::create($request->all());
+        Event::create([
+            'title'       => $request->title,
+            'event_date'  => Carbon::parse($request->event_date)->format('Y-m-d H:i:s'),
+            'location'    => $request->location,
+            'description' => $request->description,
+            'user_id'     => auth()->id(), 
+        ]);
 
         return redirect()->route('events.index')
                          ->with('success', 'Evento creado correctamente.');
@@ -44,7 +51,7 @@ class EventController extends Controller
 
     public function show(Event $event)
     {
-        return view('events.show', compact('event'));
+        return view('events.edit', compact('event'));
     }
 
     public function edit(Event $event)
@@ -60,7 +67,12 @@ class EventController extends Controller
             'location' => 'required',
         ]);
 
-        $event->update($request->all());
+        $event->update([
+            'title'       => $request->title,
+            'event_date'  => Carbon::parse($request->event_date)->format('Y-m-d H:i:s'),
+            'location'    => $request->location,
+            'description' => $request->description,
+        ]);
 
         return redirect()->route('events.index')
                          ->with('success', 'Evento actualizado.');

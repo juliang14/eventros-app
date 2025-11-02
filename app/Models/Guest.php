@@ -18,7 +18,9 @@ class Guest extends Model
         'email',
         'phone',
         'invite_code',
-        'confirmed' // 👈 nuevo campo
+        'companions_names',
+        'companions_count',
+        'confirmed'
     ];
 
     /**
@@ -36,7 +38,7 @@ class Guest extends Model
 
     public function reservedGifts()
     {
-        return $this->hasMany(GiftList::class, 'guest_id');
+        return $this->hasMany(Gift::class, 'guest_id');
     }
 
     /**
@@ -46,7 +48,20 @@ class Guest extends Model
     {
         static::creating(function ($model) {
             if (empty($model->invite_code)) {
-                $model->invite_code = Str::random(12); // o Str::uuid()
+                $model->invite_code = Str::random(12);
+            }
+
+            // Calcular el número de acompañantes automáticamente si existe la lista
+            if (!empty($model->companions_names)) {
+                $model->companions_count = count(explode('|', $model->companions_names));
+            }
+        });
+
+        static::updating(function ($model) {
+            if (!empty($model->companions_names)) {
+                $model->companions_count = count(explode('|', $model->companions_names));
+            } else {
+                $model->companions_count = 0;
             }
         });
     }
