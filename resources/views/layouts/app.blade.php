@@ -13,6 +13,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet" >
     <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet" >
+    {{-- SweetAlert2 --}}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -57,6 +59,12 @@
                         <a class="nav-link {{ request()->routeIs('gifts.*') ? 'active' : '' }}" 
                            href="{{ route('gifts.index') }}">
                            <i class="bi bi-gift"></i> Regalos
+                        </a>
+                    </li>
+                    <li class="nav-item px-2">
+                        <a class="nav-link {{ request()->routeIs('sendInvitations.*') ? 'active' : '' }}" 
+                        href="{{ route('sendInvitations.index') }}">
+                        <i class="bi bi-envelope-paper"></i> Enviar Invitaciones
                         </a>
                     </li>
                 </ul>
