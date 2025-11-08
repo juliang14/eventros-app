@@ -4,6 +4,7 @@
     </IfModule>
 
     RewriteEngine On
+    RewriteBase /eventos-app/   # 👈 IMPORTANTE: base del subdirectorio
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .

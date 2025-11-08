@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Throwable;
+use Illuminate\Support\Facades\Http;
 
 class SendInvitationController extends Controller
 {
@@ -83,22 +84,18 @@ class SendInvitationController extends Controller
         $event = Event::findOrFail($data['event_id']);
         $channel = $data['channel'];
 
-        // Query base de invitados del evento
         $guestsQuery = Guest::where('event_id', $event->id);
 
-        // Si se envía lista puntual
         if (!empty($data['guest_ids'])) {
             $guestsQuery->whereIn('id', $data['guest_ids']);
         }
 
-        // Si se pide reenviar fallidas, ajustamos la query con ids de SendInvitation que fallaron
         if (!empty($data['resend_failed'])) {
             $failedGuestIds = SendInvitation::where('event_id', $event->id)
                 ->where('status', SendInvitation::STATUS_FAILED)
                 ->pluck('guest_id')
                 ->toArray();
 
-            // si no hay fallidas, devolver info inmediatamente
             if (empty($failedGuestIds)) {
                 return response()->json([
                     'success' => true,
@@ -112,7 +109,6 @@ class SendInvitationController extends Controller
         }
 
         $guests = $guestsQuery->get();
-
         $sentCount = 0;
         $failedCount = 0;
         $createdCount = 0;
@@ -120,10 +116,8 @@ class SendInvitationController extends Controller
         DB::beginTransaction();
         try {
             foreach ($guests as $guest) {
-                // Mensaje base personalizable
                 $baseMessage = "Hola {$guest->name},\nEstás invitado al evento \"{$event->title}\" el día {$event->event_date->format('d/m/Y H:i')}.\nVerifica tu invitación: " . url('/invitations/'.$guest->invite_code);
 
-                // Registrar / actualizar SendInvitation (status pending por ahora)
                 $invitation = SendInvitation::updateOrCreate(
                     [
                         'event_id' => $event->id,
@@ -136,43 +130,25 @@ class SendInvitationController extends Controller
                     ]
                 );
 
-                $finalMessage = $baseMessage;
-                $overallStatus = SendInvitation::STATUS_SENT; // asumimos éxito, si algo falla lo marcamos
+                $overallStatus = SendInvitation::STATUS_SENT;
 
                 // Email
-                if ($channel === SendInvitation::CHANNEL_EMAIL || $channel === SendInvitation::CHANNEL_BOTH) {
+                if ($channel === 'email' || $channel === 'both') {
                     if (!empty($guest->email)) {
                         try {
-                            Mail::raw($finalMessage, function ($m) use ($guest, $event) {
+                            Mail::raw($baseMessage, function ($m) use ($guest, $event) {
                                 $m->to($guest->email)
-                                  ->subject("Invitación: {$event->title}");
+                                ->subject("Invitación: {$event->title}");
                             });
                         } catch (Throwable $e) {
-                            // marca fallo
                             $overallStatus = SendInvitation::STATUS_FAILED;
-                            $finalMessage .= "\n\nError Email: " . $e->getMessage();
                         }
                     } else {
                         $overallStatus = SendInvitation::STATUS_FAILED;
-                        $finalMessage .= "\n\nError: invitado no tiene email registrado.";
                     }
                 }
 
-                // WhatsApp (solo anexamos link; envío manual desde la UI si quieres)
-                if ($channel === SendInvitation::CHANNEL_WHATSAPP || $channel === SendInvitation::CHANNEL_BOTH) {
-                    if (!empty($guest->phone)) {
-                        $waLink = "https://wa.me/{$guest->phone}?text=" . rawurlencode($finalMessage);
-                        $finalMessage .= "\n\nWhatsApp link: {$waLink}";
-                    } else {
-                        $overallStatus = SendInvitation::STATUS_FAILED;
-                        $finalMessage .= "\n\nError: invitado no tiene teléfono registrado.";
-                    }
-                }
-
-                // Guardar resultado
-                $invitation->message = $finalMessage;
                 $invitation->status = $overallStatus;
-                $invitation->channel = $channel;
                 $invitation->save();
 
                 if ($overallStatus === SendInvitation::STATUS_SENT) {
@@ -185,6 +161,11 @@ class SendInvitationController extends Controller
             }
 
             DB::commit();
+
+            // ✅ Si el canal incluye WhatsApp, dispara el envío real
+            if ($channel === 'whatsapp' || $channel === 'both') {
+                $this->sendAllWhatsApp($request);
+            }
 
             return response()->json([
                 'success' => true,
@@ -207,6 +188,8 @@ class SendInvitationController extends Controller
      */
     public function sendAllWhatsApp(Request $request)
     {
+        \Log::info('>>> Entrando a sendAllWhatsApp', ['event_id' => $request->input('event_id')]);
+
         $eventId = $request->input('event_id');
         $event = Event::findOrFail($eventId);
 
@@ -225,23 +208,42 @@ class SendInvitationController extends Controller
 
         foreach ($guests as $guest) {
             try {
-                // Personalizar mensaje
+                \Log::info('>>> Id invitado:', ['code' => $guest->invite_code]);
+
+                // URL personalizada de confirmación
+                $confirmationUrl = "https://devjgomez.com/eventos-app/invitations/{$guest->invite_code}";
+                \Log::info('>>> enviando url invitacion', ['url' => $confirmationUrl]);
+
+                // Procesar nombres de acompañantes
+                $names = [$guest->name];
+                if (!empty($guest->companions_names)) {
+                    $companionsArray = array_map('trim', explode('|', $guest->companions_names));
+                    $names = array_merge($names, $companionsArray);
+                }
+
+                // Formatear con comas y "y" antes del último
+                if (count($names) > 1) {
+                    $last = array_pop($names);
+                    $fullNames = implode(', ', $names) . ' y ' . $last;
+                } else {
+                    $fullNames = $names[0];
+                }
+
+                // Reemplazar variables dinámicas
                 $msg = str_replace(
-                    ['XXXNOMBRESXXX', 'XXXCOMPANIONSXXX'],
-                    [$guest->name, $guest->companions_names ?? ''],
+                    ['{{NOMBRES_COMPLETOS}}', '{{URL}}'],
+                    [$fullNames, $confirmationUrl],
                     $event->description
                 );
 
-                // Enviar a Node.js
-                $response = Http::post($baseUrl, [
-                    'phone' => $guest->phone,
+                $response = Http::asJson()->post($baseUrl, [
+                    'phone' => '57' . $guest->phone,
                     'message' => $msg
                 ]);
 
                 $status = $response->ok() ? 'sent' : 'failed';
                 if ($status === 'sent') $sent++; else $failed++;
 
-                // Guardar registro o actualizar
                 SendInvitation::updateOrCreate(
                     ['event_id' => $eventId, 'guest_id' => $guest->id],
                     [
@@ -252,6 +254,10 @@ class SendInvitationController extends Controller
                 );
 
             } catch (\Throwable $th) {
+                \Log::error('Error enviando mensaje WhatsApp', [
+                    'guest' => $guest->id,
+                    'error' => $th->getMessage()
+                ]);
                 $failed++;
                 SendInvitation::updateOrCreate(
                     ['event_id' => $eventId, 'guest_id' => $guest->id],

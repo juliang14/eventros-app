@@ -31,8 +31,9 @@
 
                     {{-- WhatsApp --}}
                     <div class="text-center">
-                        <button id="connectWhatsApp" class="btn btn-outline-success w-100 position-relative" data-bs-toggle="modal" data-bs-target="#modalWhatsapp">
-                            <i class="bi bi-whatsapp"></i> Conectar WhatsApp
+                        <button id="connectWhatsApp" class="btn btn-outline-success w-100 position-relative">
+                            <i class="bi bi-whatsapp"></i> 
+                            <span id="whatsappButtonText">Conectar WhatsApp</span>
                         </button>
                         <div id="whatsapp-status" class="small mt-1 text-center text-muted">
                             🔴 Sin conexión
@@ -137,7 +138,7 @@
 
 @push('scripts')
 <script>
-/* === CONSULTAR INVITACIONES === (sin cambios) */
+/* === CONSULTAR INVITACIONES === */
 document.getElementById('loadInvitations').addEventListener('click', async () => {
     const eventId = document.getElementById('event_id').value;
     const list = document.getElementById('invitation-list');
@@ -197,26 +198,101 @@ document.getElementById('loadInvitations').addEventListener('click', async () =>
     }
 });
 
+/* === ENVÍO DE INVITACIONES === */
+document.getElementById('sendAllForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    const channel = formData.get('channel');
+
+    Swal.fire({
+        title: 'Enviando invitaciones...',
+        text: 'Por favor espera mientras se procesan los envíos.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+    });
+
+    try {
+        const endpoint =
+            channel === 'whatsapp'
+                ? '/send-invitations/whatsapp'
+                : '/send-invitations/send';
+
+        const res = await fetch(endpoint, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: '✅ Proceso completado',
+                html: `
+                    <p><b>Enviadas correctamente:</b> ${data.sent}</p>
+                    <p><b>Fallidas:</b> ${data.failed}</p>
+                    <p><b>Total procesadas:</b> ${data.processed ?? data.sent + data.failed}</p>
+                `,
+            }).then(() => document.getElementById('loadInvitations').click());
+        } else {
+            Swal.fire('Error', data.message || 'Hubo un problema en el envío.', 'error');
+        }
+    } catch (err) {
+        Swal.fire('Error', 'No se pudo contactar con el servidor. ' + err.message, 'error');
+    }
+});
+
+/* === REENVIAR FALLIDAS === */
+document.getElementById('resendFailedForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+
+    Swal.fire({
+        title: 'Reenviando invitaciones fallidas...',
+        text: 'Esto puede tardar unos segundos.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+    });
+
+    try {
+        const res = await fetch('/send-invitations/send', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: '✅ Reenvío completado',
+                html: `
+                    <p><b>Enviadas correctamente:</b> ${data.sent}</p>
+                    <p><b>Fallidas:</b> ${data.failed}</p>
+                    <p><b>Total procesadas:</b> ${data.processed}</p>
+                `,
+            }).then(() => document.getElementById('loadInvitations').click());
+        } else {
+            Swal.fire('Error', data.message || 'No se pudieron reenviar las invitaciones.', 'error');
+        }
+    } catch (err) {
+        Swal.fire('Error', 'Error de conexión con el servidor. ' + err.message, 'error');
+    }
+});
+
 /* === CONEXIÓN WHATSAPP (API local Node.js) === */
 const qrContainer = document.getElementById('qrContainer');
 const whatsappStatus = document.getElementById('whatsapp-status');
 const modalWhatsapp = document.getElementById('modalWhatsapp');
 let qrInterval = null;
 let countdownInterval = null;
-let qrExpiresIn = 60; // segundos de validez del QR
+let qrExpiresIn = 60;
 
 function startCountdown() {
     const countdownEl = document.getElementById('qrCountdown');
     clearInterval(countdownInterval);
     countdownEl.textContent = `⏳ QR válido por ${qrExpiresIn}s`;
-
     countdownInterval = setInterval(() => {
         qrExpiresIn--;
         countdownEl.textContent = `⏳ QR válido por ${qrExpiresIn}s`;
         if (qrExpiresIn <= 0) {
             clearInterval(countdownInterval);
             countdownEl.textContent = '⚠️ QR expirado, generando nuevo...';
-            loadQRCode(true); // fuerza refresco
+            loadQRCode(true);
         }
     }, 1000);
 }
@@ -233,16 +309,14 @@ async function loadQRCode(auto = false) {
             whatsappStatus.className = 'text-success fw-semibold';
             clearInterval(qrInterval);
             clearInterval(countdownInterval);
-            qrInterval = countdownInterval = null;
             const modalInstance = bootstrap.Modal.getInstance(modalWhatsapp);
             if (modalInstance) modalInstance.hide();
             return;
         }
 
         if (data.qr) {
-            qrExpiresIn = 60; // reiniciar cuenta regresiva
-            qrContainer.innerHTML = `
-                <img src="${data.qr}" alt="QR" class="img-fluid rounded m-auto">
+            qrExpiresIn = 60;
+            qrContainer.innerHTML = `<img src="${data.qr}" alt="QR" class="img-fluid rounded m-auto">
                 <p id="qrCountdown" class="text-muted small mt-2"></p>`;
             startCountdown();
         } else {
@@ -278,6 +352,88 @@ modalWhatsapp.addEventListener('hidden.bs.modal', () => {
     clearInterval(countdownInterval);
     qrInterval = countdownInterval = null;
 });
+
+// ✅ Verificar conexión automáticamente al cargar la vista
+document.addEventListener('DOMContentLoaded', () => {
+    checkWhatsAppConnection();
+});
+
+async function checkWhatsAppConnection() {
+    try {
+        const response = await fetch("http://localhost:3000/qr");
+        const data = await response.json();
+
+        if (data.connected) {
+            whatsappStatus.innerText = '🟢 Conectado';
+            whatsappStatus.className = 'text-success fw-semibold';
+            qrContainer.innerHTML = `<div class="text-success fw-bold">🟢 Sesión activa. Puedes enviar mensajes.</div>`;
+            localStorage.setItem('whatsapp_connected', 'true');
+            btnText.textContent = 'Desconectar WhatsApp';
+            connectBtn.classList.remove('btn-outline-success');
+            connectBtn.classList.add('btn-danger');
+        } else {
+            whatsappStatus.innerText = '🔴 Sin conexión';
+            whatsappStatus.className = 'text-muted small';
+            localStorage.setItem('whatsapp_connected', 'false');
+            btnText.textContent = 'Conectar WhatsApp';
+            connectBtn.classList.remove('btn-danger');
+            connectBtn.classList.add('btn-outline-success');
+        }
+    } catch (error) {
+        whatsappStatus.innerText = '🔴 Sin conexión (Error API)';
+        whatsappStatus.className = 'text-muted small';
+        localStorage.setItem('whatsapp_connected', 'false');
+        btnText.textContent = 'Conectar WhatsApp';
+        connectBtn.classList.remove('btn-danger');
+        connectBtn.classList.add('btn-outline-success');
+    }
+}
+
+/* === BOTÓN CONECTAR / DESCONECTAR WHATSAPP === */
+const connectBtn = document.getElementById('connectWhatsApp');
+const btnText = document.getElementById('whatsappButtonText');
+
+connectBtn.addEventListener('click', async () => {
+    const isConnected = localStorage.getItem('whatsapp_connected') === 'true';
+
+    if (!isConnected) {
+        // 🔹 Si no está conectado, abrimos el modal para escanear el QR
+        const modal = new bootstrap.Modal(document.getElementById('modalWhatsapp'));
+        modal.show();
+    } else {
+        // 🔹 Si está conectado, pedimos confirmación para cerrar sesión
+        const result = await Swal.fire({
+            title: '¿Desconectar WhatsApp?',
+            text: 'Esto cerrará la sesión activa y deberás volver a escanear el QR para enviar mensajes.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, desconectar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const response = await fetch("http://localhost:3000/logout");
+                const data = await response.json();
+
+                if (data.success) {
+                    Swal.fire('Desconectado', 'La sesión de WhatsApp fue cerrada correctamente.', 'success');
+                    localStorage.setItem('whatsapp_connected', 'false');
+                    whatsappStatus.innerText = '🔴 Sin conexión';
+                    whatsappStatus.className = 'text-muted small';
+                    btnText.textContent = 'Conectar WhatsApp';
+                    connectBtn.classList.remove('btn-danger');
+                    connectBtn.classList.add('btn-outline-success');
+                } else {
+                    Swal.fire('Error', data.message || 'No se pudo cerrar la sesión.', 'error');
+                }
+            } catch (err) {
+                Swal.fire('Error', 'No se pudo contactar con el servicio Node.js.', 'error');
+            }
+        }
+    }
+});
+
 </script>
 @endpush
 @endsection

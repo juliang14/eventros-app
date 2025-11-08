@@ -11,87 +11,65 @@ use App\Http\Middleware\AdminMiddleware;
 
 /*
 |--------------------------------------------------------------------------
-| Rutas Públicas
+| Configuración de prefijo dinámico
+|--------------------------------------------------------------------------
+| Si estás en producción (Hostinger), las rutas se sirven desde /eventos-app.
+| En local, el prefijo será vacío para mantener las rutas limpias.
 |--------------------------------------------------------------------------
 */
-
-// Página de inicio → redirige al login
-Route::get('/', function () {
-    return redirect()->route('login');
-});
-
-// Invitaciones (sin login)
-Route::get('/invitations/{code}', [RsvpController::class, 'show'])->name('invitations.show');
-Route::post('/invitations/{code}/rsvp', [RsvpController::class, 'store'])->name('invitations.rsvp');
+$prefix = app()->environment('production') ? 'eventos-app' : '';
 
 /*
 |--------------------------------------------------------------------------
-| Rutas Protegidas (solo administrador)
+| Rutas Públicas
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', AdminMiddleware::class])->group(function () {
+Route::prefix($prefix)->group(function () {
 
-    // 📊 Dashboard principal
-    Route::get('/dashboard', [EventController::class, 'dashboard'])->name('dashboard');
+    // Página de inicio → redirige al login
+    Route::get('/', function () {
+        return redirect()->route('login');
+    });
 
-    /*
-    |--------------------------------------------------------------------------
-    | CRUD de eventos
-    |--------------------------------------------------------------------------
-    */
-    Route::resource('events', EventController::class);
-
-    /*
-    |--------------------------------------------------------------------------
-    | CRUD de invitados
-    |--------------------------------------------------------------------------
-    */
-    Route::resource('guests', GuestController::class);
-    Route::post('/importar-excel', [GuestController::class, 'importarExcel'])->name('importarExcel');
+    // Invitaciones (sin login)
+    Route::get('/invitations/{code}', [RsvpController::class, 'show'])->name('invitations.show');
+    Route::post('/invitations/{code}/rsvp', [RsvpController::class, 'store'])->name('invitations.rsvp');
 
     /*
     |--------------------------------------------------------------------------
-    | CRUD de regalos
+    | Rutas Protegidas (solo administrador)
     |--------------------------------------------------------------------------
     */
-    Route::resource('gifts', GiftController::class);
+    Route::middleware(['auth', AdminMiddleware::class])->group(function () {
 
-    /*
-    |--------------------------------------------------------------------------
-    | Módulo de Envío de Invitaciones
-    |--------------------------------------------------------------------------
-    |
-    | - index() → lista los eventos disponibles y las invitaciones previas
-    | - getGuestsByEvent() → retorna invitados de un evento (para JS/fetch)
-    | - store() → envía las invitaciones (por email, WhatsApp o ambas)
-    | 
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('send-invitations')->group(function () {
-        // Página principal
-        Route::get('/', [SendInvitationController::class, 'index'])->name('sendInvitations.index');
+        // 📊 Dashboard principal
+        Route::get('/dashboard', [EventController::class, 'dashboard'])->name('dashboard');
 
-        // Obtener invitados por evento (AJAX)
-        Route::get('/event/{event_id}/guests', [SendInvitationController::class, 'getGuestsByEvent'])
-            ->name('sendInvitations.getGuestsByEvent');
+        // CRUD de eventos
+        Route::resource('events', EventController::class);
 
-        // Enviar invitaciones (por formulario o fetch)
-        Route::post('/send', [SendInvitationController::class, 'store'])
-            ->name('sendInvitations.store');
+        // CRUD de invitados
+        Route::resource('guests', GuestController::class);
+        Route::post('/importar-excel', [GuestController::class, 'importarExcel'])->name('importarExcel');
+
+        // CRUD de regalos
+        Route::resource('gifts', GiftController::class);
+
+        // Módulo de envío de invitaciones
+        Route::prefix('send-invitations')->group(function () {
+            Route::get('/', [SendInvitationController::class, 'index'])->name('sendInvitations.index');
+            Route::get('/event/{event_id}/guests', [SendInvitationController::class, 'getGuestsByEvent'])->name('sendInvitations.getGuestsByEvent');
+            Route::post('/send', [SendInvitationController::class, 'store'])->name('sendInvitations.store');
+        });
+
+        // WhatsApp Web
+        Route::post('/send-invitations/whatsapp', [SendInvitationController::class, 'sendAllWhatsApp'])->name('send.whatsapp');
     });
 
     /*
     |--------------------------------------------------------------------------
-    | WhatsApp Web - Conexión
+    | Autenticación
     |--------------------------------------------------------------------------
     */
-    Route::post('/send-invitations/whatsapp', [SendInvitationController::class, 'sendAllWhatsApp'])->name('send.whatsapp');
-
+    require __DIR__ . '/auth.php';
 });
-
-/*
-|--------------------------------------------------------------------------
-| Autenticación
-|--------------------------------------------------------------------------
-*/
-require __DIR__.'/auth.php';

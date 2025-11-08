@@ -62,6 +62,36 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 
 ## IMPORTANT
 
-- php artisan serve     -> Desplegar servidor artisan
-- php artisan migrate   -> Migrar tablas a base de datos
-- php artisan db:seed   -> Exportar datos desde Seeaders
+### Comandos Laravel
+- `php artisan serve`     -> Desplegar servidor artisan
+- `php artisan migrate`   -> Migrar tablas a base de datos
+- `php artisan db:seed`   -> Exportar datos desde Seeders
+
+### Comandos Node/Vite
+- `npm install`           -> Instalar dependencias de Node
+- `npm run dev`           -> Ejecutar servidor de desarrollo con hot reload
+- `npm run build`         -> Compilar assets para producción
+- `npm run prod`          -> Alias para compilación de producción
+
+### Carpetas a **no subir a producción**
+- `node_modules/`         
+  > Solo sirve para compilar assets en desarrollo. No se necesita en producción.
+- `tests/`                
+  > Contiene pruebas unitarias y de integración, no necesarias en producción.
+- `.vscode/` o `.idea/`   
+  > Configuración del IDE, no afecta la app.
+- Archivos de desarrollo como:
+  - `webpack.mix.js`
+  - `vite.config.js`
+  - `.env.example`
+  > Solo son útiles en desarrollo o para documentación.
+- Carpeta `storage/logs` puede subirse vacía, pero no es necesario subir logs antiguos.
+
+### Carpetas / archivos **que sí se deben subir**
+- `app/`, `bootstrap/`, `config/`, `database/` (sin los seeds de prueba si no los necesitas)  
+- `resources/` (plantillas Blade, vistas, assets no compilados si se usan en Laravel Mix o Vite)  
+- `vendor/` (dependencias de PHP)  
+- `public/` (con assets compilados desde Vite: `public/build/`, `public/css/`, `public/js/`)  
+- `.env` con configuración de producción  
+
+> 💡 Tip: Siempre compilar los assets localmente antes de subirlos al hosting, y nunca subir `node_modules`.

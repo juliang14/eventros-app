@@ -181,7 +181,8 @@
       </div>
 
       <div class="modal-body text-center">
-        <p class="fs-5">¿Seguro que deseas eliminar al invitado <strong id="nombreInvitado"></strong>?</p>
+        <p class="fs-5">¿Seguro que deseas eliminar al invitado <br><strong id="nombreInvitado"></strong>?
+        </p>
         <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
       </div>
 
