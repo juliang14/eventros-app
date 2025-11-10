@@ -54,6 +54,7 @@ Route::prefix($prefix)->group(function () {
 
         // CRUD de regalos
         Route::resource('gifts', GiftController::class);
+        Route::delete('/gifts/delete-image/{id}', [GiftController::class, 'deleteImage'])->name('gifts.deleteImage');
 
         // Módulo de envío de invitaciones
         Route::prefix('send-invitations')->group(function () {

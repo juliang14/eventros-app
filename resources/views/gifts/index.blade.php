@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    use Illuminate\Support\Str;
+@endphp
+
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2 class="fw-bold text-dark mb-0 text-center flex-grow-1">🎁 Lista de Regalos</h2>
@@ -42,18 +46,29 @@
                     </thead>
                     <tbody>
                         @foreach($gifts as $gift)
+                            {{-- Mostrar según hide_when_reserved y disponibilidad --}}
                             @if(!$gift->hide_when_reserved || !method_exists($gift, 'isFullyReserved') || !$gift->isFullyReserved())
                             <tr>
                                 <td>{{ $gift->id }}</td>
                                 <td style="width: 90px;">
                                     @php
                                         $imagePath = $gift->image_path;
-                                        // Si ya es una URL completa (empieza con http o https), úsala tal cual.
-                                        if (Str::startsWith($imagePath, ['http://', 'https://'])) {
+                                        // Priorizar URL absoluta (http/https)
+                                        if ($imagePath && Str::startsWith($imagePath, ['http://', 'https://'])) {
                                             $imageUrl = $imagePath;
-                                        } else {
-                                            // Si es una ruta relativa (almacenada en storage), construimos la URL correctamente.
-                                            $imageUrl = $imagePath ? asset('storage/'.$imagePath) : asset('images/no-image.png');
+                                        }
+                                        // Si viene con prefijo /storage/ o storage/ (Storage::url/Storage::disk('public'))
+                                        elseif ($imagePath && Str::startsWith($imagePath, ['/storage/', 'storage/'])) {
+                                            // asset() maneja bien ambas variantes, pero limpiamos doble slash por si acaso
+                                            $imageUrl = asset(ltrim($imagePath, '/'));
+                                        }
+                                        // Ruta relativa dentro de public (ej. images/...)
+                                        elseif ($imagePath) {
+                                            $imageUrl = asset($imagePath);
+                                        }
+                                        // Fallback por defecto
+                                        else {
+                                            $imageUrl = asset('images/no-image.png');
                                         }
                                     @endphp
 

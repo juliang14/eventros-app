@@ -43,10 +43,6 @@
             font-size: 0.95rem;
         }
 
-        .event-info table {
-            width: 100%;
-        }
-
         .event-info i {
             color: #0d6efd;
             margin-right: 6px;
@@ -59,7 +55,6 @@
             line-height: 1.6;
         }
 
-        /* 🎁 Sección de regalos */
         .gifts-section h5 {
             color: #004080;
             font-weight: 600;
@@ -89,7 +84,7 @@
         }
 
         .gift-card img {
-            width: 100%;
+            width: 100px;
             height: 100px;
             object-fit: cover;
             border-radius: 10px;
@@ -103,19 +98,15 @@
             pointer-events: none;
         }
 
-        .gift-details strong {
-            color: #004080;
-            display: block;
-            margin-bottom: 4px;
+        .badge-qty {
+            background-color: #e3f2fd;
+            color: #0d6efd;
+            border-radius: 8px;
+            padding: 3px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
 
-        .gift-details small {
-            color: #6c757d;
-            display: block;
-            font-size: 0.8rem;
-        }
-
-        /* 🎉 Botones con animaciones */
         .btn-confirm {
             position: relative;
             background-color: #0d6efd;
@@ -133,50 +124,13 @@
             transform: scale(1.05);
         }
 
-        /* 🎊 Confeti animado realista */
-        .btn-confirm .confetti {
-            position: absolute;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            animation: fall 1.2s linear forwards;
-            opacity: 0;
-        }
-
-        @keyframes fall {
-            0% {
-                transform: translateY(0) scale(1);
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(40px) scale(0.8);
-                opacity: 0;
-            }
-        }
-
-        /* 😢 Carita triste */
         .btn-decline {
             border: 1.5px solid #dc3545;
             color: #dc3545;
             background: #fff;
             border-radius: 10px;
             padding: 10px 22px;
-            position: relative;
             transition: all .3s ease;
-        }
-
-        .btn-decline::after {
-            content: '😢';
-            position: absolute;
-            opacity: 0;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            transition: opacity .3s ease;
-        }
-
-        .btn-decline:hover::after {
-            opacity: 1;
         }
 
         .btn-decline:hover {
@@ -185,18 +139,59 @@
             transform: scale(1.05);
         }
 
+        .confirmation-message {
+            text-align: center;
+            margin: 25px 0;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .confirmation-message.success {
+            background-color: #e0f7fa;
+            color: #006064;
+        }
+
+        .confirmation-message.danger {
+            background-color: #fdecea;
+            color: #b71c1c;
+        }
+
         footer {
             text-align: center;
             font-size: 0.85rem;
             color: #6c757d;
             margin-top: 20px;
         }
-
-        @media (max-width: 576px) {
-            .header h1 {
-                font-size: 1.6rem;
-            }
+        /* 🖱️ Mostrar cursor tipo mano cuando sea seleccionable */
+        .gift-card {
+            cursor: pointer;
+            transition: all 0.25s ease-in-out;
         }
+
+        /* ✨ Cuando el checkbox esté marcado */
+        .gift-card input[type="checkbox"]:checked + img,
+        .gift-card input[type="checkbox"]:checked ~ .gift-details {
+            border-color: #0d6efd;
+        }
+
+        /* 🌟 Alternativamente, aplicar el borde al contenedor completo */
+        .gift-card input[type="checkbox"]:checked {
+            outline: none;
+        }
+
+        .gift-card:has(input[type="checkbox"]:checked) {
+            border: 2px solid #0d6efd;
+            box-shadow: 0 0 8px rgba(13, 110, 253, 0.4);
+            transform: scale(1.03);
+        }
+
+        .gift-card:not(.disabled):hover {
+            box-shadow: 0 0 10px rgba(13, 110, 253, 0.15);
+            transform: scale(1.02);
+        }
+
     </style>
 </head>
 <body>
@@ -205,15 +200,19 @@
     <div class="invitation-card shadow-lg">
         <div class="header">
             <h1>{{ $event->title }}</h1>
+            @if(!empty($guest->name))
+                <p class="mb-0 guest-name">Hola {{ $guest->name }} 👋</p>
+            @endif
             <p class="mb-0">💙 ¡Te esperamos para celebrar juntos la llegada de Julián Esteban! 💙</p>
         </div>
 
         <div class="card-body p-4">
+
             <div class="event-info">
-                <table>
+                <table class="w-100">
                     <tr>
                         <td><i class="bi bi-calendar-event"></i> <strong>Fecha:</strong></td>
-                        <td>{{ $event->event_date->format('d/m/Y H:i') }}</td>
+                        <td><strong>{{ \Carbon\Carbon::parse($event->event_date)->format('d/m/Y h:i A') }}</strong></td>
                     </tr>
                     <tr>
                         <td><i class="bi bi-geo-alt"></i> <strong>Lugar:</strong></td>
@@ -222,79 +221,141 @@
                 </table>
             </div>
 
-            <div class="description text-center">
-                Nos encantaría contar contigo en este día tan especial 🌟.  
-                Si deseas compartir un detalle, puedes ayudarnos con alguno de los regalos de la lista 🎁.  
-                ¡No te sientas comprometido! Tu presencia es lo más importante 💙.
+            {{-- 💬 Mensaje dinámico según estado --}}
+            <div id="confirmationMessages">
+                @if($guest->confirmed == 1)
+                    <div id="msgConfirmed" class="confirmation-message success">
+                        🎉 ¡Estamos felices de que hayas confirmado tu asistencia! 💙
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-outline-primary" id="btnModify">Modificar respuesta</button>
+                        </div>
+                    </div>
+                @elseif($guest->confirmed == 2)
+                    <div id="msgDeclined" class="confirmation-message danger">
+                        😢 Lamentamos que no puedas acompañarnos. 💔
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-outline-primary" id="btnModify">Modificar respuesta</button>
+                        </div>
+                    </div>
+                @endif
             </div>
 
-            <form method="POST" action="{{ route('invitations.rsvp', $guest->invite_code) }}">
-                @csrf
+            {{-- 💝 Sección de regalos (solo visible si confirmed == 0 o al modificar respuesta) --}}
+            <div id="giftsForm" class="{{ $guest->confirmed != 0 ? 'd-none' : '' }}">
+                <div class="description text-center">
+                    Nos encantaría contar contigo en este día tan especial 🌟.  
+                    Si deseas compartir un detalle, puedes ayudarnos con alguno de los regalos de la lista 🎁.  
+                    ¡No te sientas comprometido! Tu presencia es lo más importante 💙.
+                </div>
 
-                <div class="gifts-section">
-                    <h5>🎁 Selecciona tu(s) regalo(s)</h5>
-                    <div class="gifts-grid">
-                        @foreach($gifts as $gift)
-                            @php
-                                $available = ($gift->quantity - $gift->reserved_count) > 0;
-                                $isMandatory = (bool) ($gift->is_required ?? $gift->is_mandatory ?? false);
-                            @endphp
+                <form method="POST" action="{{ route('invitations.rsvp', $guest->invite_code) }}">
+                    @csrf
+                    <div class="gifts-section">
+                        <h5>🎁 Selecciona tu(s) regalo(s)</h5>
+                        {{-- 💬 Mensaje si ya confirmó asistencia --}}
+                        @if($guest->confirmed > 0)
+                            <div class="alert alert-info text-center mt-2" style="font-size: 0.9rem;">
+                                <i class="bi bi-info-circle"></i>
+                                Si deseas <strong>agregar o quitar regalos</strong>, presiona nuevamente el botón 
+                                <strong>"Asistiré"</strong> para actualizar tu selección. 🎁
+                            </div>
 
-                            @if($available || $isMandatory)
+                            <div class="alert alert-warning text-center mt-2" style="font-size: 0.9rem;">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                Si decides <strong>no asistir</strong>, tus regalos seleccionados se liberarán automáticamente 
+                                para que otros invitados puedan elegirlos. 💙
+                            </div>
+                        @endif
+                        <div class="gifts-grid">
+                            @foreach($gifts as $gift)
                                 @php
-                                    $imagePath = !empty($gift->image_path)
-                                        ? asset('storage/invitations/' . $gift->image_path)
-                                        : asset('images/default_gift.png');
+                                    $availableQty = max(0, $gift->quantity - $gift->reserved_count);
+                                    $available = $availableQty > 0;
+                                    $isMandatory = (bool) ($gift->is_required ?? $gift->is_mandatory ?? false);
+                                    $imagePath = $gift->image_path ? asset($gift->image_path) : asset('images/default_gift.png');
+
+                                    // 🔹 Nuevo: saber si el invitado actual reservó este regalo
+                                    $reservedBy = $gift->reserved_by ? explode('|', $gift->reserved_by) : [];
+                                    $isReservedByGuest = in_array($guest->id, $reservedBy);
                                 @endphp
 
-                                <label class="gift-card {{ $isMandatory ? 'disabled' : '' }}">
-                                    <input type="checkbox" name="gifts[]" value="{{ $gift->id }}"
-                                           class="form-check-input me-2"
-                                           {{ $isMandatory ? 'checked disabled' : '' }}>
-                                    <img src="{{ $imagePath }}" alt="{{ $gift->name }}">
-                                    <div class="gift-details">
-                                        <strong>{{ $gift->name }}</strong>
-                                        @if($gift->description)
-                                            <small>{{ $gift->description }}</small>
-                                        @endif
-                                        @if($isMandatory)
-                                            <span class="badge bg-secondary mt-1">Incluido 🎁</span>
-                                        @endif
-                                    </div>
-                                </label>
-                            @endif
-                        @endforeach
-                    </div>
-                </div>
+                                {{-- 🔹 Mostrar condiciones según disponibilidad y reservas --}}
+                                @if($available || $isMandatory || ($guest->confirmed == 1 && $isReservedByGuest))
+                                    <label class="gift-card {{ $isMandatory ? 'disabled' : '' }}">
+                                        <input 
+                                            type="checkbox" 
+                                            name="gifts[]" 
+                                            value="{{ $gift->id }}"
+                                            class="form-check-input me-2"
+                                            {{-- Regla de selección según caso --}}
+                                            @if($isMandatory)
+                                                checked disabled
+                                            @elseif($isReservedByGuest)
+                                                checked {{-- Puede desmarcar --}}
+                                            @elseif(!$available)
+                                                disabled {{-- Sin stock y no reservado por él --}}
+                                            @endif
+                                        >
 
-                <div class="text-center mt-4">
-                    <button type="button" name="status" value="confirmed" class="btn btn-confirm me-2" id="btnConfirm">
-                        Asistiré
-                    </button>
-                    <button name="status" value="declined" class="btn btn-decline">No podré</button>
-                </div>
-            </form>
+                                        <img src="{{ $imagePath }}" alt="{{ $gift->name }}">
+                                        <div class="gift-details">
+                                            <strong>{{ $gift->name }}</strong>
+                                            @if($gift->description)
+                                                <small>{{ $gift->description }}</small>
+                                            @endif
+
+                                            {{-- Etiquetas informativas --}}
+                                            @if($isMandatory)
+                                                <span class="badge bg-secondary mt-1">Incluido 🎁</span>
+                                            @elseif($isReservedByGuest && !$available)
+                                                <span class="badge bg-warning text-dark mt-1">Reservado por ti 💙</span>
+                                            @else
+                                                <span class="badge-qty mt-1">{{ $availableQty }} disponibles</span>
+                                            @endif
+                                        </div>
+                                    </label>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <button type="submit" name="status" value="confirmed" class="btn btn-confirm me-2" id="btnConfirm">
+                            Asistiré
+                        </button>
+                        <button type="submit" name="status" value="declined" class="btn btn-decline">No podré</button>
+                    </div>
+                </form>
+            </div>
+
         </div>
 
         <footer class="pb-3">
-            Con cariño, <strong>Dayana y Julián 💙</strong>
+            Con cariño, <strong>Carolay y Julián 💙</strong>
         </footer>
     </div>
 </div>
 
 <script>
-    // 🎊 Efecto confeti simple en hover y clic del botón "Asistiré"
+    // 🎊 Confetti efecto
     const btnConfirm = document.getElementById('btnConfirm');
-    btnConfirm.addEventListener('mouseenter', () => makeConfetti(btnConfirm));
-    btnConfirm.addEventListener('click', () => makeConfetti(btnConfirm));
+    if (btnConfirm) {
+        btnConfirm.addEventListener('mouseenter', () => makeConfetti(btnConfirm));
+        btnConfirm.addEventListener('click', () => makeConfetti(btnConfirm));
+    }
 
     function makeConfetti(button) {
-        for (let i = 0; i < 15; i++) {
+        for (let i = 0; i < 20; i++) {
             const confetti = document.createElement('span');
             confetti.classList.add('confetti');
-            confetti.style.left = `${Math.random() * 100}%`;
+            confetti.style.position = 'absolute';
+            confetti.style.width = '6px';
+            confetti.style.height = '6px';
+            confetti.style.borderRadius = '50%';
             confetti.style.backgroundColor = randomColor();
-            confetti.style.animationDelay = `${Math.random() * 0.5}s`;
+            confetti.style.left = `${Math.random() * 100}%`;
+            confetti.style.animation = 'fall 1.2s linear forwards';
+            confetti.style.opacity = '0';
             button.appendChild(confetti);
             setTimeout(() => confetti.remove(), 1200);
         }
@@ -303,6 +364,15 @@
     function randomColor() {
         const colors = ['#ff4d4d', '#ffd633', '#66ff66', '#66b3ff', '#ff80d5', '#ffa64d'];
         return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // ✨ Mostrar formulario al presionar "Modificar respuesta"
+    const btnModify = document.getElementById('btnModify');
+    if (btnModify) {
+        btnModify.addEventListener('click', () => {
+            document.getElementById('giftsForm').classList.remove('d-none');
+            document.getElementById('confirmationMessages').classList.add('d-none');
+        });
     }
 </script>
 

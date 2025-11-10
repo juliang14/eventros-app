@@ -41,32 +41,23 @@ class GiftController extends Controller
             'image' => 'nullable|image|max:2048',
         ]);
 
-        // Ajustar cantidad según tipo
         $validated['is_required'] = $request->has('is_required');
         $validated['hide_when_reserved'] = $request->has('hide_when_reserved');
-
-        if ($validated['is_required']) {
-            $validated['quantity'] = 999999999;
-        } else {
-            $validated['quantity'] = $request->input('quantity', 1);
-        }
-
+        $validated['quantity'] = $validated['is_required'] ? 999999999 : ($request->input('quantity', 1));
         $validated['reserved_count'] = 0;
         $validated['is_reserved'] = false;
         $validated['reserved_by'] = null;
 
-        // Subir imagen o asignar por defecto
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('gifts', 'public');
-            $validated['image_path'] = 'storage/' . $path;
+            $validated['image_path'] = Storage::url($path);
         } else {
-            $validated['image_path'] = asset('images/default_gift.png');
+            $validated['image_path'] = 'images/default_gift.png';
         }
 
         Gift::create($validated);
 
-        return redirect()->route('gifts.index')
-            ->with('success', 'Regalo agregado correctamente.');
+        return redirect()->route('gifts.index')->with('success', 'Regalo agregado correctamente.');
     }
 
     /**
@@ -94,27 +85,19 @@ class GiftController extends Controller
 
         $validated['is_required'] = $request->has('is_required');
         $validated['hide_when_reserved'] = $request->has('hide_when_reserved');
+        $validated['quantity'] = $validated['is_required'] ? 999999999 : ($request->input('quantity', 1));
 
-        // Reglas automáticas
-        if ($validated['is_required']) {
-            $validated['quantity'] = 999999999;
-        } else {
-            $validated['quantity'] = $request->input('quantity', 1);
-        }
-
-        // Manejar imagen (si se reemplaza)
         if ($request->hasFile('image')) {
-            if ($gift->image_path && str_contains($gift->image_path, 'storage/')) {
-                Storage::disk('public')->delete(str_replace('storage/', '', $gift->image_path));
+            if ($gift->image_path && str_starts_with($gift->image_path, '/storage/')) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $gift->image_path));
             }
             $path = $request->file('image')->store('gifts', 'public');
-            $validated['image_path'] = 'storage/' . $path;
+            $validated['image_path'] = Storage::url($path);
         }
 
         $gift->update($validated);
 
-        return redirect()->route('gifts.index')
-            ->with('success', 'Regalo actualizado correctamente.');
+        return redirect()->route('gifts.index')->with('success', 'Regalo actualizado correctamente.');
     }
 
     /**
@@ -122,12 +105,30 @@ class GiftController extends Controller
      */
     public function destroy(Gift $gift)
     {
-        if ($gift->image_path && str_contains($gift->image_path, 'storage/')) {
-            Storage::disk('public')->delete(str_replace('storage/', '', $gift->image_path));
+        if ($gift->image_path && str_starts_with($gift->image_path, '/storage/')) {
+            Storage::disk('public')->delete(str_replace('/storage/', '', $gift->image_path));
         }
 
         $gift->delete();
-        return redirect()->route('gifts.index')
-            ->with('success', 'Regalo eliminado correctamente.');
+
+        return redirect()->route('gifts.index')->with('success', 'Regalo eliminado correctamente.');
+    }
+
+    /**
+     * Eliminar solo la imagen de un regalo
+     */
+    public function deleteImage($id)
+    {
+        $gift = Gift::findOrFail($id);
+
+        if ($gift->image_path && str_starts_with($gift->image_path, '/storage/')) {
+            $path = str_replace('/storage/', '', $gift->image_path);
+            Storage::disk('public')->delete($path);
+            $gift->image_path = null;
+            $gift->save();
+            return response()->json(['success' => true]);
+        }
+
+        return response()->json(['success' => false]);
     }
 }

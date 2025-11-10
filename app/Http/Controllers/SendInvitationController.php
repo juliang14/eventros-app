@@ -236,8 +236,14 @@ class SendInvitationController extends Controller
                     $event->description
                 );
 
+                $phone = preg_replace('/\D/', '', $guest->phone);
+
+                if (strlen($phone) === 10) {
+                    $phone = '57' . $phone;
+                }
+
                 $response = Http::asJson()->post($baseUrl, [
-                    'phone' => '57' . $guest->phone,
+                    'phone' => $phone,
                     'message' => $msg
                 ]);
 

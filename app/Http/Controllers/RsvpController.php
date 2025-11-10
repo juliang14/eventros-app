@@ -32,7 +32,7 @@ class RsvpController extends Controller
         $data = $request->validate([
             'status' => 'required|in:confirmed,declined',
             'gifts' => 'array',
-            'gifts.*' => 'integer|exists:ev_gift,id'
+            'gifts.*' => 'integer|exists:ev_gifts,id'
         ]);
 
         DB::transaction(function() use ($guest, $data) {
@@ -43,32 +43,42 @@ class RsvpController extends Controller
                 ['status' => $data['status']]
             );
 
-            // 2️⃣ Si confirma asistencia, actualizar regalos seleccionados
-            if ($data['status'] === 'confirmed' && !empty($data['gifts'])) {
-                foreach ($data['gifts'] as $giftId) {
-                    $gift = Gift::lockForUpdate()->find($giftId); // Evita conflictos concurrentes
+            // Obtener todos los regalos del evento
+            $allGifts = Gift::where('event_id', $guest->event_id)->lockForUpdate()->get();
 
-                    if ($gift && $gift->reserved_count < $gift->quantity) {
-                        // Revisar si el invitado ya está registrado en reserved_by
-                        $reservedBy = $gift->reserved_by ? explode('|', $gift->reserved_by) : [];
+            foreach ($allGifts as $gift) {
+                $reservedBy = $gift->reserved_by ? explode('|', $gift->reserved_by) : [];
 
-                        if (!in_array($guest->id, $reservedBy)) {
-                            $reservedBy[] = $guest->id;
+                // Si este invitado lo tenía reservado y ya no está en la nueva selección -> liberar
+                if (in_array($guest->id, $reservedBy) && (
+                    $data['status'] === 'declined' ||
+                    empty($data['gifts']) ||
+                    !in_array($gift->id, $data['gifts'])
+                )) {
+                    $reservedBy = array_diff($reservedBy, [$guest->id]);
+                    $gift->update([
+                        'reserved_count' => max(0, $gift->reserved_count - 1),
+                        'reserved_by' => implode('|', $reservedBy)
+                    ]);
+                }
 
-                            // Incrementar contador y actualizar reserved_by
-                            $gift->update([
-                                'reserved_count' => $gift->reserved_count + 1,
-                                'reserved_by' => implode('|', $reservedBy)
-                            ]);
-                        }
+                // Si confirmó asistencia y seleccionó este regalo -> reservar
+                if ($data['status'] === 'confirmed' && !empty($data['gifts']) && in_array($gift->id, $data['gifts'])) {
+                    if (!in_array($guest->id, $reservedBy) && $gift->reserved_count < $gift->quantity) {
+                        $reservedBy[] = $guest->id;
+                        $gift->update([
+                            'reserved_count' => $gift->reserved_count + 1,
+                            'reserved_by' => implode('|', $reservedBy)
+                        ]);
                     }
                 }
             }
 
-            // 3️⃣ Actualizar campo confirmed del invitado
-            $guest->update(['confirmed' => $data['status'] === 'confirmed']);
+            // 3️⃣ Actualizar campo confirmed del invitado (1 o 2)
+            $guest->update(['confirmed' => $data['status'] === 'confirmed' ? 1 : 2]);
         });
 
-        return redirect()->back()->with('success', 'Respuesta registrada. ¡Gracias por confirmar tu asistencia!');
+        return redirect()->back()->with('success', 'Tu respuesta fue registrada correctamente 💙');
     }
+
 }
